@@ -1,0 +1,351 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Image-based Online Exam (Single-file)</title>
+  <style>
+    :root{--bg:#f6f7fb;--card:#fff;--accent:#2563eb;--muted:#6b7280}
+    *{box-sizing:border-box}
+    body{font-family:Inter,ui-sans-serif,system-ui,Arial;margin:0;background:var(--bg);color:#111}
+    .container{max-width:900px;margin:28px auto;padding:20px}
+    .top{display:flex;justify-content:space-between;align-items:center}
+    h1{font-size:20px;margin:0}
+    .card{background:var(--card);border-radius:12px;padding:18px;box-shadow:0 6px 18px rgba(15,23,42,0.06);margin-top:14px}
+    .row{display:flex;gap:12px}
+    .col{flex:1}
+    label{display:block;font-size:13px;margin-bottom:6px;color:var(--muted)}
+    input[type=text],textarea,select{width:100%;padding:8px;border-radius:8px;border:1px solid #e6e9ef}
+    button{background:var(--accent);color:#fff;border:0;padding:10px 12px;border-radius:8px;cursor:pointer}
+    button.ghost{background:transparent;color:var(--accent);border:1px solid #dbeafe}
+    .q-preview img{max-width:100%;height:auto;border-radius:8px}
+    .options{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}
+    .opt-btn{padding:10px;border-radius:8px;border:1px solid #e6e9ef;background:#fff;cursor:pointer}
+    .opt-btn.selected{box-shadow:inset 0 0 0 3px rgba(37,99,235,0.08);border-color:rgba(37,99,235,0.3)}
+    .controls{display:flex;gap:8px;justify-content:space-between;align-items:center;margin-top:12px}
+    .small{font-size:13px;color:var(--muted)}
+    .badge{display:inline-block;padding:6px 8px;border-radius:999px;background:#eef2ff;color:#1e40af;font-weight:600}
+    .grid-questions{display:flex;flex-wrap:wrap;gap:6px;margin-top:12px}
+    .q-chip{padding:6px 8px;border-radius:8px;background:#f3f4f6;border:1px solid #e9ecef;cursor:pointer}
+    .marked{outline:3px solid #fbbf24}
+    .results-list{display:grid;gap:10px;margin-top:12px}
+    .result-row{padding:12px;border-radius:8px;background:#fff;border:1px solid #eef2ff}
+    .correct{color:green;font-weight:700}
+    .wrong{color:#c53030;font-weight:700}
+    .left{display:flex;gap:8px;align-items:center}
+    footer{margin-top:18px;text-align:center;color:var(--muted);font-size:13px}
+    @media(max-width:640px){.options{grid-template-columns:1fr}.row{flex-direction:column}}
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="top">
+      <h1>Image-based Online Exam</h1>
+      <div>
+        <label class="small">Mode</label>
+        <select id="modeSelect"><option value="student">Student</option><option value="admin">Admin</option></select>
+      </div>
+    </div>
+
+    <div id="adminPanel" class="card" style="display:none">
+      <h3>Admin: Build / Export Exam</h3>
+      <div style="margin-top:10px">
+        <label>Question text (optional)</label>
+        <input id="qText" type="text" placeholder="Describe the image or question" />
+      </div>
+      <div style="margin-top:10px">
+        <label>Image file (choose local file) or paste image URL</label>
+        <input id="imgFile" type="file" accept="image/*" />
+        <input id="imgUrl" type="text" placeholder="Or paste image URL (raw GitHub URL works)" style="margin-top:6px" />
+      </div>
+      <div class="options" style="margin-top:10px">
+        <div>
+          <label>A</label>
+          <input id="optA" type="text" placeholder="Option A" />
+        </div>
+        <div>
+          <label>B</label>
+          <input id="optB" type="text" placeholder="Option B" />
+        </div>
+        <div>
+          <label>C</label>
+          <input id="optC" type="text" placeholder="Option C" />
+        </div>
+        <div>
+          <label>D</label>
+          <input id="optD" type="text" placeholder="Option D" />
+        </div>
+      </div>
+      <div style="margin-top:10px">
+        <label>Correct answer</label>
+        <select id="correct">
+          <option value="A">A</option>
+          <option value="B">B</option>
+          <option value="C">C</option>
+          <option value="D">D</option>
+        </select>
+      </div>
+      <div style="margin-top:12px;display:flex;gap:8px">
+        <button id="addQ">Add Question</button>
+        <button id="clearQ" class="ghost">Clear Fields</button>
+        <button id="exportJson" class="ghost">Export exam JSON</button>
+        <button id="importJson" class="ghost">Import exam JSON</button>
+        <input id="importFile" type="file" accept="application/json" style="display:none" />
+      </div>
+
+      <div style="margin-top:14px">
+        <label class="small">Preview / Questions</label>
+        <div id="qList" class="grid-questions"></div>
+      </div>
+    </div>
+
+    <div id="studentPanel" class="card" style="display:none">
+      <h3>Student: Take Exam</h3>
+      <div class="row" style="gap:10px">
+        <div class="col">
+          <label>Load exam JSON file or paste URL (host exam.json and images in the same repo for easy use)</label>
+          <div style="display:flex;gap:8px">
+            <input id="examUrl" type="text" placeholder="Paste raw GitHub URL or public exam JSON URL" />
+            <button id="loadUrl" class="ghost">Load</button>
+          </div>
+          <div style="margin-top:8px">
+            <input id="examFile" type="file" accept="application/json" />
+            <label class="small" style="display:block;margin-top:8px">Or load from local JSON exported by admin</label>
+          </div>
+        </div>
+        <div style="width:220px;text-align:right">
+          <div class="small">Questions: <span id="qCount">0</span></div>
+          <div class="small">Time: <span id="timeLeft">--</span></div>
+          <div style="margin-top:8px">
+            <button id="startExam">Start Exam</button>
+            <button id="resetExam" class="ghost">Reset</button>
+          </div>
+        </div>
+      </div>
+
+      <div id="examArea" style="display:none;margin-top:12px">
+        <div class="card q-preview">
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <div>
+              <div class="small">Question <span id="qIndex">0</span> / <span id="qTotal">0</span></div>
+              <div id="qTextDisplay" style="font-weight:600;margin-top:6px"></div>
+            </div>
+            <div class="left">
+              <div id="markedForReview" class="small" style="margin-right:8px;display:none;color:#b45309">Marked for review</div>
+              <div class="badge" id="scoreBadge">Saved: 0</div>
+            </div>
+          </div>
+          <div style="margin-top:10px;text-align:center">
+            <img id="qImage" src="" alt="question image" style="max-height:420px;object-fit:contain" />
+          </div>
+
+          <div class="options" id="optionsArea"></div>
+
+          <div class="controls">
+            <div style="display:flex;gap:8px;align-items:center">
+              <button id="prevBtn" class="ghost">Previous</button>
+              <button id="nextBtn" class="ghost">Next</button>
+              <button id="markBtn" class="ghost">Mark for review</button>
+            </div>
+            <div style="display:flex;gap:8px;align-items:center">
+              <button id="submitBtn">Submit Exam</button>
+            </div>
+          </div>
+
+          <div style="margin-top:10px">
+            <div class="small">Quick navigation</div>
+            <div id="quickNav" class="grid-questions"></div>
+          </div>
+        </div>
+
+        <div id="results" style="display:none" class="card">
+          <h3>Results</h3>
+          <div id="scoreText" style="font-size:18px;font-weight:700"></div>
+          <div id="details" class="results-list"></div>
+          <div style="margin-top:12px;display:flex;gap:8px">
+            <button id="retake" class="ghost">Retake (reset answers)</button>
+            <button id="downloadReport" class="ghost">Download Report JSON</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <footer>Built for simple image-based exams — export exam JSON and host on GitHub Pages. See the comments at top of this file for GitHub instructions.</footer>
+  </div>
+
+  <script>
+    // Minimal single-file exam app
+    // Data model: {title, questions:[{text,imageUrl,options:{A,B,C,D},answer, studentAnswer, marked}]}
+    let exam = {title:'Untitled Exam', questions:[]};
+    const modeSelect = document.getElementById('modeSelect');
+    const adminPanel = document.getElementById('adminPanel');
+    const studentPanel = document.getElementById('studentPanel');
+
+    modeSelect.addEventListener('change',()=>{updateMode();});
+    function updateMode(){
+      const v=modeSelect.value;
+      adminPanel.style.display = v==='admin'? 'block':'none';
+      studentPanel.style.display = v==='student'? 'block':'none';
+    }
+    updateMode();
+
+    // Admin controls
+    const qText = document.getElementById('qText');
+    const imgFile = document.getElementById('imgFile');
+    const imgUrl = document.getElementById('imgUrl');
+    const optA=document.getElementById('optA'),optB=document.getElementById('optB'),optC=document.getElementById('optC'),optD=document.getElementById('optD');
+    const correct=document.getElementById('correct');
+    const addQ=document.getElementById('addQ'),clearQ=document.getElementById('clearQ');
+    const qList=document.getElementById('qList');
+    const exportJson=document.getElementById('exportJson');
+    const importJson=document.getElementById('importJson');
+    const importFile=document.getElementById('importFile');
+
+    function renderQList(){
+      qList.innerHTML='';
+      exam.questions.forEach((q,i)=>{
+        const btn=document.createElement('div');btn.className='q-chip';btn.textContent='Q'+(i+1);
+        if(q.marked) btn.classList.add('marked');
+        btn.addEventListener('click',()=>{if(confirm('Delete question '+(i+1)+'?')){exam.questions.splice(i,1);renderQList();updateCounts();}});
+        qList.appendChild(btn);
+      });
+    }
+
+    async function fileToDataUrl(file){
+      return new Promise((res,rej)=>{
+        const r=new FileReader();r.onload=e=>res(e.target.result);r.onerror=rej;r.readAsDataURL(file);
+      })
+    }
+
+    addQ.addEventListener('click',async ()=>{
+      const text=qText.value.trim();
+      let image='';
+      if(imgFile.files && imgFile.files[0]){ image = await fileToDataUrl(imgFile.files[0]); }
+      else if(imgUrl.value.trim()){ image = imgUrl.value.trim(); }
+      else{ alert('Please provide an image file or an image URL.'); return; }
+      const q={text,image,options:{A:optA.value||'A',B:optB.value||'B',C:optC.value||'C',D:optD.value||'D'},answer:correct.value,studentAnswer:null,marked:false};
+      exam.questions.push(q);
+      renderQList(); clearFields(); updateCounts();
+    });
+    clearQ.addEventListener('click',clearFields);
+    function clearFields(){ qText.value=''; imgFile.value=''; imgUrl.value=''; optA.value='';optB.value='';optC.value='';optD.value=''; correct.value='A'; }
+
+    exportJson.addEventListener('click',()=>{
+      const blob=new Blob([JSON.stringify(exam,null,2)],{type:'application/json'});
+      const url=URL.createObjectURL(blob);
+      const a=document.createElement('a');a.href=url;a.download='exam.json';document.body.appendChild(a);a.click();a.remove();URL.revokeObjectURL(url);
+    });
+    importJson.addEventListener('click',()=>importFile.click());
+    importFile.addEventListener('change',()=>{
+      const f=importFile.files[0];if(!f) return;const r=new FileReader();r.onload=e=>{try{exam=JSON.parse(e.target.result);renderQList();updateCounts();alert('Exam imported. Switch to Student mode and load it.')}catch(err){alert('Invalid JSON');}};r.readAsText(f);
+    });
+
+    function updateCounts(){document.getElementById('qCount').textContent=exam.questions.length}
+
+    // Student side
+    const examUrl=document.getElementById('examUrl'),loadUrl=document.getElementById('loadUrl'),examFile=document.getElementById('examFile');
+    const startExam=document.getElementById('startExam'),resetExam=document.getElementById('resetExam');
+    const examArea=document.getElementById('examArea'),qIndexSpan=document.getElementById('qIndex'),qTotalSpan=document.getElementById('qTotal');
+    const qTextDisplay=document.getElementById('qTextDisplay'),qImage=document.getElementById('qImage'),optionsArea=document.getElementById('optionsArea');
+    const prevBtn=document.getElementById('prevBtn'),nextBtn=document.getElementById('nextBtn'),markBtn=document.getElementById('markBtn'),submitBtn=document.getElementById('submitBtn');
+    const quickNav=document.getElementById('quickNav'),scoreBadge=document.getElementById('scoreBadge'),markedForReview=document.getElementById('markedForReview');
+    const resultsDiv=document.getElementById('results'),scoreText=document.getElementById('scoreText'),detailsDiv=document.getElementById('details'),retake=document.getElementById('retake'),downloadReport=document.getElementById('downloadReport');
+
+    let currentIndex=0;let studentExam=null;
+
+    loadUrl.addEventListener('click',async ()=>{
+      const url=examUrl.value.trim(); if(!url) return alert('Paste raw JSON URL (e.g. GitHub raw url)');
+      try{
+        const res=await fetch(url); if(!res.ok) throw new Error('HTTP '+res.status);
+        const data=await res.json(); studentExam=JSON.parse(JSON.stringify(data));
+        examLoaded();
+      }catch(err){alert('Failed to load exam: '+err.message)}
+    });
+
+    examFile.addEventListener('change',()=>{
+      const f=examFile.files[0]; if(!f) return; const r=new FileReader(); r.onload=e=>{ try{ studentExam=JSON.parse(e.target.result); examLoaded(); }catch(err){alert('Invalid JSON');} }; r.readAsText(f);
+    });
+
+    function examLoaded(){
+      if(!studentExam.questions || !Array.isArray(studentExam.questions)) return alert('Invalid exam structure');
+      studentExam.questions.forEach(q=>{q.studentAnswer=null;q.marked=false});
+      document.getElementById('qTotal').textContent=studentExam.questions.length;
+      document.getElementById('qIndex').textContent=0; document.getElementById('qTotal').textContent=studentExam.questions.length;
+      updateCounts(); examArea.style.display='block'; document.getElementById('qCount').textContent=studentExam.questions.length; document.getElementById('qTotal').textContent=studentExam.questions.length;
+      // show start ready
+      alert('Exam loaded. Press Start Exam to begin.');
+    }
+
+    startExam.addEventListener('click',()=>{
+      if(!studentExam){ if(exam.questions.length>0){ studentExam=JSON.parse(JSON.stringify(exam)); } else { return alert('No exam loaded or created.'); } }
+      currentIndex=0; renderQuestion(); renderQuickNav(); document.getElementById('qTotal').textContent=studentExam.questions.length; resultsDiv.style.display='none';
+    });
+    resetExam.addEventListener('click',()=>{studentExam=null;examArea.style.display='none';document.getElementById('qCount').textContent=0;document.getElementById('qTotal').textContent=0;});
+
+    function renderQuestion(){
+      const q=studentExam.questions[currentIndex]; document.getElementById('qIndex').textContent = currentIndex+1; qTextDisplay.textContent=q.text||''; qImage.src=q.image||''; markedForReview.style.display = q.marked? 'block':'none';
+      // options
+      optionsArea.innerHTML=''; ['A','B','C','D'].forEach(key=>{
+        const btn=document.createElement('div'); btn.className='opt-btn'; btn.innerHTML = '<strong>'+key+'</strong> &nbsp; '+(q.options[key]||'');
+        if(q.studentAnswer===key) btn.classList.add('selected');
+        btn.addEventListener('click',()=>{ q.studentAnswer = key; updateSavedCount(); renderQuestion(); renderQuickNav(); });
+        optionsArea.appendChild(btn);
+      });
+      updateSavedCount();
+    }
+
+    function updateSavedCount(){
+      const saved = studentExam.questions.filter(q=>q.studentAnswer).length; scoreBadge.textContent = 'Saved: '+saved;
+    }
+
+    prevBtn.addEventListener('click',()=>{ if(!studentExam) return; if(currentIndex>0) currentIndex--; renderQuestion(); });
+    nextBtn.addEventListener('click',()=>{ if(!studentExam) return; if(currentIndex<studentExam.questions.length-1) currentIndex++; renderQuestion(); });
+    markBtn.addEventListener('click',()=>{ const q=studentExam.questions[currentIndex]; q.marked = !q.marked; renderQuestion(); renderQuickNav(); });
+
+    function renderQuickNav(){ quickNav.innerHTML=''; studentExam.questions.forEach((q,i)=>{ const b=document.createElement('div'); b.className='q-chip'; b.textContent=(i+1); if(q.marked) b.classList.add('marked'); if(q.studentAnswer) b.style.background='#ecfccb'; b.addEventListener('click',()=>{ currentIndex=i; renderQuestion(); }); quickNav.appendChild(b); }); }
+
+    submitBtn.addEventListener('click',()=>{
+      if(!studentExam) return; if(!confirm('Submit exam? You can download a report after submission.')) return; gradeExam();
+    });
+
+    function gradeExam(){
+      let correctCount=0; detailsDiv.innerHTML=''; studentExam.questions.forEach((q,i)=>{
+        const isCorrect = q.studentAnswer && q.studentAnswer===q.answer;
+        if(isCorrect) correctCount++;
+        const row = document.createElement('div'); row.className='result-row';
+        row.innerHTML = '<div style="display:flex;justify-content:space-between"><div><strong>Q'+(i+1)+'</strong> '+(q.text?(' - '+q.text):'')+'</div><div>'+(isCorrect?'<span class="correct">Correct</span>':'<span class="wrong">Wrong</span>')+'</div></div>' +
+          '<div style="margin-top:8px">Your answer: '+(q.studentAnswer||'–')+' | Correct: '+q.answer+'</div>';
+        detailsDiv.appendChild(row);
+      });
+      const percent = (correctCount/studentExam.questions.length)*100||0; scoreText.textContent = `Score: ${correctCount} / ${studentExam.questions.length} (${Math.round(percent)}%)`;
+      resultsDiv.style.display='block'; examArea.scrollIntoView({behavior:'smooth'});
+    }
+
+    retake.addEventListener('click',()=>{
+      if(!studentExam) return; studentExam.questions.forEach(q=>{q.studentAnswer=null;q.marked=false}); renderQuestion(); renderQuickNav(); resultsDiv.style.display='none'; updateSavedCount();
+    });
+
+    downloadReport.addEventListener('click',()=>{
+      const report = {title:studentExam.title||'Exam Report', timestamp:new Date().toISOString(), answers:studentExam.questions.map((q,i)=>({question:i+1, text:q.text, yourAnswer:q.studentAnswer, correctAnswer:q.answer, correct: q.studentAnswer===q.answer }))};
+      const blob=new Blob([JSON.stringify(report,null,2)],{type:'application/json'}); const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download='exam-report.json'; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+    });
+
+    // small helpers: allow hosting on GitHub Pages
+    // How to use with GitHub:
+    // 1) Create a new GitHub repository. Add this file as index.html in the repository root.
+    // 2) If you want to host images on the repo, create a folder (e.g. /images) and push image files there.
+    // 3) Create exam JSON (export from Admin mode), edit the image fields to point to raw GitHub URLs (https://raw.githubusercontent.com/<user>/<repo>/main/images/your.jpg) or keep data URLs produced by admin.
+    // 4) Commit exam.json to the repo (e.g. /exam.json). On GitHub go to Settings -> Pages -> choose branch main and root, then save to enable GitHub Pages.
+    // 5) Use the raw GitHub URL (https://raw.githubusercontent.com/...) or the GitHub Pages URL to load the exam JSON in Student mode.
+
+    // Optional: load demo exam for quick try
+    const demoBtn = document.createElement('button'); demoBtn.textContent='Load Demo'; demoBtn.className='ghost'; demoBtn.style.marginLeft='8px'; document.querySelector('.top').appendChild(demoBtn);
+    demoBtn.addEventListener('click',()=>{
+      exam = {title:'Demo', questions:[
+        {text:'Identify the shape', image:'https://raw.githubusercontent.com/johan/world.geo.json/master/img/usa.png', options:{A:'Circle',B:'Square',C:'Triangle',D:'Rectangle'},answer:'C',studentAnswer:null,marked:false},
+      ]}; renderQList(); updateCounts(); alert('Demo exam created in Admin mode. Switch to Student mode or export JSON.');
+    });
+  </script>
+
+</body>
+</html>
